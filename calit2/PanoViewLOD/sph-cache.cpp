@@ -816,7 +816,7 @@ int up(TIFF *T, int i)
 
 int dn(TIFF *T, int i)
 {
-    uint64 *v;
+    uint64_t *v;
     uint16  n;
     
     if (TIFFGetField(T, TIFFTAG_SUBIFD, &n, &v))

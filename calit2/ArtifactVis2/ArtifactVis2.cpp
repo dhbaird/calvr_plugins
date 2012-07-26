@@ -63,7 +63,7 @@ CVRPLUGIN(ArtifactVis2)
 ArtifactVis2 * ArtifactVis2::_artifactvis2 = NULL;
 ArtifactVis2::ArtifactVis2()
 {
-
+    _ossim=false;
 }
 ArtifactVis2::~ArtifactVis2()
 {
@@ -138,14 +138,28 @@ bool ArtifactVis2::init()
     {
 	_avMenu->addItem(_tablesMenu);
     }
+    
+    //Generates the menus to fly to coordinates.
+    setupFlyToMenu();
+
+    _bookmarkLoc = new MenuButton("Save Location");
+    _bookmarkLoc->setCallback(this);
+    _avMenu->addItem(_bookmarkLoc);
 
     _selectArtifactCB = new MenuCheckbox("Select Artifact",false);
     _selectArtifactCB->setCallback(this);
     _avMenu->addItem(_selectArtifactCB);
 
+    
+    _manipArtifactCB = new MenuCheckbox("Manipulate Artifact",false);
+    _manipArtifactCB->setCallback(this);
+    _avMenu->addItem(_manipArtifactCB);
+    
     _scaleBar = new MenuCheckbox("Scale Bar",false); //new
     _scaleBar->setCallback(this);
     _avMenu->addItem(_scaleBar);
+
+
 
     _selectCB = new MenuCheckbox("Select box", false);
     _selectCB->setCallback(this);
@@ -203,11 +217,12 @@ bool ArtifactVis2::init()
     _selectionStatsPanel = new DialogPanel(450,"Selection Stats","Plugin.ArtifactVis2.SelectionStatsPanel");
     _selectionStatsPanel->setVisible(false);
     //_testA = 0;
-    std::cerr << "ArtifactVis2 init done.\n";
+    
     //std::cerr << selectArtifactSelected() << "\n";
 
     //SpaceNavigator Included
     statusSpnav = false; //made global
+
     if(ComController::instance()->isMaster())
     {
 	if(spnav_open()==-1)
@@ -247,6 +262,28 @@ bool ArtifactVis2::init()
 
 
     //........................................................................
+    //Check if Hand Tracking is active for Model Manipulation
+    if(PluginHelper::getNumHands() > 0)
+    {
+        _handOn = true;
+        cerr << "Hand Tracking is Activated\n";
+    }
+    else
+    {
+        _handOn = false;
+        cerr << "Hand Tracking is Not Activated\n";
+    }
+
+    _handOn=false; //Hand Tracking for Artifacts is currently disabled until Stereo problem fixed
+    
+    
+    
+    
+    
+    //........................................................................
+	//float minval = ConfigManager::getFloat("value","Near",0.0f);
+    //std::cerr << "Min Dist:"<< minval << "\n";
+        std::cerr << "ArtifactVis2 init done.\n";
     return true;
 }
 
@@ -269,13 +306,13 @@ void ArtifactVis2::loadModels()
             string modelPath = ConfigManager::getEntry("Plugin.ArtifactVis2.3DModelFolder").append("dcode_models/Finished/obj/"+dc+"/"+dc+".obj");
             if(modelExists(modelPath.c_str()))
             {
-                cout << "Model " << modelPath << " Exists \n";
+                //cout << "Model " << modelPath << " Exists \n";
                 _models[i*26+j] = osgDB::readNodeFile(modelPath);
-                _modelLoaded[i*26+j] = true;
+                _modelLoaded[i*26+j] = _models[i*26+j].valid();
             }
             else
             {
-               // cout << "Model " << modelPath << " Not Exists \n";
+                //cout << "Model " << modelPath << " Not Exists \n";
                 _models[i*26+j] = NULL;
                 _modelLoaded[i*26+j] = false;
             }
@@ -405,7 +442,9 @@ std::string ArtifactVis2::getCurrentQuery(Table * t)
 
 void ArtifactVis2::menuCallback(MenuItem* menuItem)
 {
+    /*
 #ifdef WITH_OSSIMPLANET
+    
     if(!_ossim&&OssimPlanet::instance())
     {
         _ossim = true;
@@ -413,6 +452,8 @@ void ArtifactVis2::menuCallback(MenuItem* menuItem)
         cout << "Loaded into OssimPlanet." << endl;
     }
 #endif
+*/
+    //_ossim=false;
     for(int i = 0; i < _showModelCB.size(); i++)
     {
         if(menuItem == _showModelCB[i])
@@ -560,7 +601,7 @@ void ArtifactVis2::menuCallback(MenuItem* menuItem)
                      _query[1]->updated = false;
                  }
             }
-            setupQuerySelectMenu();
+            //setupQuerySelectMenu();
         }
         if(menuItem == (*t)->saveQuery)
         {
@@ -779,7 +820,60 @@ void ArtifactVis2::menuCallback(MenuItem* menuItem)
             _root->removeChild(_scaleBarModel);
         }
     }
+
+    for(int i = 0; i < _goto.size(); i++)
+    {
+        if(menuItem == _goto[i])
+        {
+        
+	double x,y,z,rx,ry,rz;	
+        x= y= z= rx= ry= rz= 0.0;
+	double bscale;
+	bscale = _flyplace->scale[i];
+	//x=-2231700;
+	//y=-4090410;
+	//z=-81120.3;
+	x = _flyplace->x[i];
+	y = _flyplace->y[i];
+	z = _flyplace->z[i];
+	rx = (_flyplace->rx[i]*2);
+	ry = (_flyplace->ry[i]*2);
+	rz = (_flyplace->rz[i]*2);
+	//-2.2317e+06,-4.09041e+06,-81120.3 Scale:55.8708
+
+	Vec3 trans = Vec3(x, y, z);
+        Matrix tmat;
+        tmat.makeTranslate(trans);
+        
+        Vec3 xa = Vec3(1.0, 0.0, 0.0);
+        Vec3 ya = Vec3(0.0, 1.0, 0.0);
+        Vec3 za = Vec3(0.0, 0.0, 1.0);
+        
+	Matrix rot;
+        rot.makeRotate(rx, xa, ry, ya, rz, za);
+
+        Matrixd gotoMat = rot * tmat;
+	Matrixd camMat = PluginHelper::getObjectMatrix();
+	float cscale = PluginHelper::getObjectScale();
+        Vec3 camTrans = camMat.getTrans();
+	Quat camQuad = camMat.getRotate();
+	cerr << (camTrans.x()/cscale) << "," << (camTrans.y()/cscale) << "," << (camTrans.z()/cscale) << " Scale:" << cscale << " Rot:" << camQuad.x() << "," << camQuad.y() << "," << camQuad.z() << "\n";
+        PluginHelper::setObjectMatrix(gotoMat);
+        PluginHelper::setObjectScale(bscale);
+	}
+    }
+    if(menuItem == _bookmarkLoc)
+    {
+	
+	Matrixd camMat = PluginHelper::getObjectMatrix();
+	float cscale = PluginHelper::getObjectScale();
+        Vec3 camTrans = camMat.getTrans();
+	Quat camQuad = camMat.getRotate();
+	cerr << " Scale:" << cscale << "Position:" << (camTrans.x()/cscale) << "," << (camTrans.y()/cscale) << "," << (camTrans.z()/cscale) << " Rot:" << camQuad.x() << "," << camQuad.y() << "," << camQuad.z() << "\n";
+
+    }
     if(menuItem == _selectArtifactCB)
+
     {
 	if(_selectArtifactCB->getValue())
 	{
@@ -1323,6 +1417,34 @@ void ArtifactVis2::preFrame()
    */
     //}
     }
+//Hand Tracking for Model Manipulation
+//bangk
+if(_handOn)
+{
+    if(_selectModelLoad && _manipArtifactCB->getValue())
+    {
+    Matrix handMat;
+    handMat = PluginHelper::getHandMat(0);
+
+    Vec3 handTrans = handMat.getTrans();
+	Quat handQuad = handMat.getRotate();
+	//cerr << "Hand Output: " << handTrans.x() << "," << handTrans.y() << "," << handTrans.z() << " Rot:" << handQuad.x() << "," << handQuad.y() << "," << handQuad.z() << "\n";
+
+    double rx,ry,rz;
+    rx = ry = rz = 0.0;
+    double rscale = 1;
+    rx = handQuad.x();
+    ry = handQuad.y();
+    rz = handQuad.z();
+    if(rx != 0 || ry != 0 || rz != 0)
+    {
+         rotateModel(rx,ry,rz);
+    }
+    }
+}
+
+
+//......................................................
 }
 void ArtifactVis2::loadScaleBar(osg::Vec3d start)
 {
@@ -1506,7 +1628,7 @@ void ArtifactVis2::setActiveArtifact(int art, int q)
                 cout << "Select Model " << modelPath << " Exists \n";
                 _modelFileNode = osgDB::readNodeFile(modelPath);
 
-
+            _selectRotx = _selectRoty = _selectRotz = 0;
             PositionAttitudeTransform* modelTrans = new PositionAttitudeTransform();
             Matrixd scale;
 
@@ -1675,6 +1797,7 @@ void ArtifactVis2::displayArtifacts(QueryGroup * query)
                    ConfigManager::getFloat("Plugin.ArtifactVis2.Offset.X",0),
                    ConfigManager::getFloat("Plugin.ArtifactVis2.Offset.Y",0),
                    ConfigManager::getFloat("Plugin.ArtifactVis2.Offset.Z",0));
+    //cerr << "Coords: " << offset.x() << "," << offset.y() << "\n";
     osg::Geode * sphereGeode = new osg::Geode();
     Vec3d center(0,0,0);
     for (; item < artifacts.end();item++)
@@ -1724,7 +1847,7 @@ void ArtifactVis2::displayArtifacts(QueryGroup * query)
            // (*item)->modelPos-=center;
         }
         Vec3d pos = (*item)->modelPos;
-        int dcInt = dc2Int((*item)->dc);
+int dcInt = dc2Int((*item)->dc);
         if(!_modelLoaded[dcInt])
        // if(true)
         {
@@ -2154,6 +2277,7 @@ void ArtifactVis2::readLocusFile(QueryGroup * query)
     for(int i = 0; i < query->loci.size(); i++)
     {
         query->sphereRoot->removeChildren(0,query->sphereRoot->getNumChildren());
+        delete query->loci[i];
     }
     query->loci.clear();
     Vec3f offset = Vec3f(
@@ -2671,13 +2795,13 @@ void ArtifactVis2::setupSiteMenu()
             if(true)
             {
                 pos = position;
-                cout << "Ossim position: ";
+                //cout << "Ossim position: ";
             }
             else
             {
                 //pos = Vec3d(0,0,0) * mirror * transMat * scaleMat * mirror * rot2 * rot1 * offsetMat;
             }
-            cout << pos[0] << ", " << pos[1] << ", " << pos[2] << endl;
+            //cout << pos[0] << ", " << pos[1] << ", " << pos[2] << endl;
             _modelDisplayMenu->addItem(site);
             _modelDisplayMenu->addItem(reload);
             _showModelCB.push_back(site);
@@ -2974,11 +3098,13 @@ void ArtifactVis2::setupQuerySelectMenu()
 }
 void ArtifactVis2::setupTablesMenu()
 {
+
     std::string file = ConfigManager::getEntry("Plugin.ArtifactVis2.Database").append("tables.xml"); //Replaced Problemo
     FILE * fp = fopen(file.c_str(),"r");
-    if(fp == NULL)
+    //FILE * fp = NULL;
+if(fp == NULL)
     {
-        std::cerr << "Unable to open file: " << file << std::endl;
+       // std::cerr << "Unable to open file: " << file << std::endl;
         return;
     }
 
@@ -3002,6 +3128,8 @@ void ArtifactVis2::setupTablesMenu()
         _tablesMenu->addItem(tableMenu);
         _tables.push_back(table);
     }
+    std::cerr << "Table.xml read!" << std::endl;
+
 }
 void ArtifactVis2::setupQueryMenu(Table * table)
 {
@@ -3016,8 +3144,9 @@ void ArtifactVis2::setupQueryMenu(Table * table)
         stringstream ss;
         ss << "./ArchInterface -m \"" << table->name << "\"";
         system(ss.str().c_str());
-    	ComController::instance()->sendSlaves(&status,sizeof(bool));
+    	
         }
+        ComController::instance()->sendSlaves(&status,sizeof(bool));
     }
     else
     {
@@ -3119,6 +3248,76 @@ void ArtifactVis2::setupQueryMenu(Table * table)
     table->saveQuery->setCallback(this);
     table->queryMenu->addItem(table->saveQuery);
     _tablesMenu->addItem(table->queryMenu);
+}
+void ArtifactVis2::setupFlyToMenu()
+{
+
+
+    std::string file = ConfigManager::getEntry("Plugin.ArtifactVis2.Database").append("flyto.xml");
+    FILE * fp = fopen(file.c_str(),"r");
+    //FILE * fp = NULL;
+if(fp == NULL)
+    {
+        std::cerr << "Unable to open file: " << file << std::endl;
+        return;
+    }
+
+    mxml_node_t * tree;
+    tree = mxmlLoadFile(NULL, fp, MXML_TEXT_CALLBACK);
+    fclose(fp);
+    if(tree == NULL)
+    {
+      std::cerr << "Unable to parse XML file: " << file << std::endl;
+      return;
+    }
+    _flyMenu = new SubMenu("Fly To");
+    _avMenu->addItem(_flyMenu);
+    mxml_node_t * fly_node = mxmlFindElement(tree, tree, "flyto", NULL, NULL, MXML_DESCEND);
+        mxml_node_t * fly_child;
+        _flyplace = new FlyPlace;
+        for(fly_child = fly_node->child; fly_child != NULL; fly_child = fly_child->next)
+    {
+        
+        mxml_node_t * type_child;
+
+	std::string flyname = mxmlFindElement(fly_child, tree, "name", NULL, NULL, MXML_DESCEND)->child->value.text.string;
+	//cerr << "Fly: " << flyname << "\n";
+	MenuButton * gotoP = new MenuButton(flyname); //new
+    	gotoP->setCallback(this);
+    	_flyMenu->addItem(gotoP);
+   	_goto.push_back(gotoP);
+	double scale;
+	//double x;
+	//double y;
+	//double z;
+
+    	_flyplace->name.push_back(flyname);
+	
+	type_child = mxmlFindElement(fly_child, tree, "scale", NULL, NULL, MXML_DESCEND)->child;
+        scale = atof(type_child->value.text.string);
+	_flyplace->scale.push_back(scale);
+	type_child = mxmlFindElement(fly_child, tree, "x", NULL, NULL, MXML_DESCEND)->child;
+        _flyplace->x.push_back((atof(type_child->value.text.string)*scale));
+	
+	type_child = mxmlFindElement(fly_child, tree, "y", NULL, NULL, MXML_DESCEND)->child;
+        _flyplace->y.push_back((atof(type_child->value.text.string)*scale));
+	
+	type_child = mxmlFindElement(fly_child, tree, "z", NULL, NULL, MXML_DESCEND)->child;
+        _flyplace->z.push_back((atof(type_child->value.text.string)*scale));
+	
+	type_child = mxmlFindElement(fly_child, tree, "rx", NULL, NULL, MXML_DESCEND)->child;
+        _flyplace->rx.push_back(atof(type_child->value.text.string));
+	
+	type_child = mxmlFindElement(fly_child, tree, "ry", NULL, NULL, MXML_DESCEND)->child;
+        _flyplace->ry.push_back(atof(type_child->value.text.string));
+	
+	type_child = mxmlFindElement(fly_child, tree, "rz", NULL, NULL, MXML_DESCEND)->child;
+        _flyplace->rz.push_back(atof(type_child->value.text.string));
+
+	//cerr << "Scale: " << _flyplace->scale[0] << "\n";
+  }
+    std::cerr << "flyto.xml read!" << std::endl;
+
 }
 void ArtifactVis2::updateSelect()
 {
@@ -3255,10 +3454,21 @@ void ArtifactVis2::rotateModel(double rx, double ry, double rz)
 
                //cout << rx << "," << ry << "," << rz << "\n";
                 //cout << _selectRotx << "," << _selectRoty << "," << _selectRotz << "\n";
-
+                if(_handOn)
+                {
+                    rx *= 10;
+                    ry *= 10;
+                    rz *= 10;
                 _selectRotx += rx;
                 _selectRoty += ry;
                 _selectRotz += rz;
+                }
+                else
+                {
+                _selectRotx += rx;
+                _selectRoty += ry;
+                _selectRotz += rz;
+                }
                 //cout << _selectRotx << "," << _selectRoty << "," << _selectRotz << "\n";
                         _root->removeChild(_selectModelLoad.get());
 

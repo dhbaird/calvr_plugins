@@ -76,6 +76,7 @@ class ArtifactVis2 : public cvr::MenuCallback, public cvr::CVRPlugin
 
         bool processEvent(cvr::InteractionEvent * event);
         bool statusSpnav;
+        bool _handOn;
         void menuCallback(cvr::MenuItem * item);
         void preFrame();
 
@@ -158,7 +159,20 @@ class ArtifactVis2 : public cvr::MenuCallback, public cvr::CVRPlugin
             cvr::MenuText * query_view;
             std::string current_query;
         };
-        osg::Node * _models[676];
+	struct FlyPlace
+        {
+	    std::vector<std::string> name;
+	    std::vector<float> scale;
+	    std::vector<double> x;
+	    std::vector<double> y;
+	    std::vector<double> z;
+	    std::vector<double> rx;
+	    std::vector<double> ry;
+	    std::vector<double> rz;
+
+	};
+	FlyPlace* _flyplace;
+        osg::ref_ptr<osg::Node> _models[676];
         bool _modelLoaded[676];
         cvr::SubMenu * _modelDisplayMenu;
         std::vector<cvr::MenuCheckbox *> _showModelCB;
@@ -180,7 +194,12 @@ class ArtifactVis2 : public cvr::MenuCallback, public cvr::CVRPlugin
         cvr::SubMenu * _locusDisplayMenu;
         cvr::MenuTextButtonSet * _locusDisplayMode;
         cvr::MenuCheckbox * _selectArtifactCB;
+        cvr::MenuCheckbox * _manipArtifactCB;
 	cvr::MenuCheckbox * _scaleBar; //new
+        cvr::SubMenu * _flyMenu;
+	std::vector<cvr::MenuButton *> _goto;
+        cvr::MenuButton * _bookmarkLoc;
+	//cvr::MenuButton * _goto; //new
         cvr::MenuCheckbox * _selectCB;
         cvr::SubMenu * _tablesMenu;
         osg::MatrixTransform * _root;
@@ -260,6 +279,7 @@ class ArtifactVis2 : public cvr::MenuCallback, public cvr::CVRPlugin
         bool modelExists(const char * filename);
         void loadModels();
         void rotateModel(double rx, double ry, double rz);
+	void setupFlyToMenu();
 
         //Space Navigator
         float transMult, rotMult;
