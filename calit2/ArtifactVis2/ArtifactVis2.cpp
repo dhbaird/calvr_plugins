@@ -223,6 +223,7 @@ bool ArtifactVis2::init()
     //SpaceNavigator Included
     statusSpnav = false; //made global
 
+    #if 0
     if(ComController::instance()->isMaster())
     {
 	if(spnav_open()==-1)
@@ -239,6 +240,7 @@ bool ArtifactVis2::init()
     {
 	ComController::instance()->readMaster((char *)&statusSpnav, sizeof(bool));
     }
+    #endif
 
     transMult = ConfigManager::getFloat("Plugin.SpaceNavigator.TransMult", 1.0);
     rotMult = ConfigManager::getFloat("Plugin.SpaceNavigator.RotMult", 1.0);
@@ -1070,6 +1072,7 @@ void ArtifactVis2::preFrame()
     //......................................................................
     //SpaceNavigator Add
     //......................................................................
+    #if 0
     if (statusSpnav)
     {
         Matrixd finalmat;
@@ -1263,6 +1266,7 @@ void ArtifactVis2::preFrame()
         }
 
     }
+    #endif
         //........................................................................
 
 

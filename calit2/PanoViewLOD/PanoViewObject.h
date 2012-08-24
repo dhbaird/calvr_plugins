@@ -70,6 +70,7 @@ class PanoViewObject : public cvr::SceneObject
         cvr::MenuCheckbox * _zoomCB;
         cvr::MenuButton * _zoomResetButton;
         cvr::MenuCheckbox * _demoMode;
+        cvr::MenuCheckbox * _funMode;
         cvr::MenuCheckbox * _trackball;
 
         osg::ref_ptr<osg::Uniform> _alphaUni;

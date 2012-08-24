@@ -95,6 +95,10 @@ void PanoViewObject::init(std::vector<std::string> & leftEyeFiles, std::vector<s
     _demoMode->setCallback(this);
     addMenuItem(_demoMode);
 
+    _funMode = new MenuCheckbox("Fun Mode", ConfigManager::getBool("value","Plugin.PanoViewLOD.FunMode",false, NULL));
+    _funMode->setCallback(this);
+    addMenuItem(_funMode);
+
     _trackball = new MenuCheckbox("Trackball Mode", false);
     _trackball->setCallback(this);
     addMenuItem(_trackball);
@@ -302,6 +306,69 @@ void PanoViewObject::updateCallback(int handID, const osg::Matrix & mat)
 	    _demoTime = 0.0;
 	    next();
 	}
+    }
+    else if(_funMode->getValue()) {
+        osg::Matrixd camera = PluginHelper::getObjectMatrix();
+        setTransform(_tbMat * _coordChangeMat * camera * _spinMat * _heightMat);
+	if(_currentZoom != 0.0)
+	{
+	    updateZoom(_lastZoomMat);
+	}
+        next();
+    }
+    else {
+        osg::Matrixd camera = PluginHelper::getObjectMatrix();
+        osg::Quat qcamera = camera.getRotate();
+        osg::Matrixd newcamera;
+        newcamera.makeIdentity();
+        #if 0
+        {
+                osg::Quat newqcamera;
+                // Limit angular degrees of freedom...
+                // See also: http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+                float q0 = qcamera.x();
+                float q1 = qcamera.y();
+                float q2 = qcamera.z();
+                float q3 = qcamera.w();
+                float t1 = atan2(2*(q0*q1 + q2*q3), 1 - 2*(q1*q1 + q2*q2));
+                float t2 = 0; //asin(2*(q0*q2 - q3*q1));
+                float t3 = atan2(2*(q0*q3 + q1*q2), 1-2*(q2*q2 + q3*q3));
+                newqcamera.set(
+                    cos(t1/2)*cos(t2/2)*cos(t3/2) + sin(t1/2)*sin(t2/2)*sin(t3/2),
+                    sin(t1/2)*cos(t2/2)*cos(t3/2) - cos(t1/2)*sin(t2/2)*sin(t3/2),
+                    cos(t1/2)*sin(t2/2)*cos(t3/2) + sin(t1/2)*cos(t2/2)*sin(t3/2),
+                    cos(t1/2)*cos(t2/2)*sin(t3/2) - sin(t1/2)*sin(t2/2)*cos(t3/2)
+                );
+                newcamera.postMultRotate(newqcamera);
+        }
+        #endif
+        #if 0
+        {
+                float x = camera(0, 0);
+                float y = camera(1, 0);
+                float z = camera(2, 0);
+                //float scale; // TODO
+                float azimuth = atan2(y, x);
+                float elevation = atan2(z, sqrt(x*x + y*y)); // <-- not quite right, yet
+                newcamera *= osg::Matrixd::rotate(azimuth, 0, 0, 1);
+                newcamera *= osg::Matrixd::rotate(elevation, 1, 0, 0); // <-- not quite right, yet
+        }
+        #endif
+        {
+                float x0 = camera(0, 3);
+                float x1 = camera(1, 3);
+                float x2 = camera(2, 3);
+                //float scale = 1 + (x0*x0 + x1*x1 + x2*x2);
+                //newcamera = osg::Matrixd(qcamera) * osg::Matrixd::scale(scale, scale, scale);
+                newcamera = osg::Matrixd(qcamera);
+        }
+        setTransform(_tbMat * _coordChangeMat * newcamera * _spinMat * _heightMat);
+        //setTransform(_tbMat * _coordChangeMat * _spinMat * _heightMat);
+	if(_currentZoom != 0.0)
+	{
+	    updateZoom(_lastZoomMat);
+	}
+        next();
     }
 }
 

@@ -131,6 +131,8 @@ PanoDrawable::~PanoDrawable()
 
 void PanoDrawable::updateRotate(float f)
 {
+    _rotation = f;
+    #if 0
     if(f < 0.1 && f > -0.1)
     {
         return;
@@ -157,11 +159,12 @@ void PanoDrawable::updateRotate(float f)
 
     _rotation += (M_PI / 50.0) * ff;
 
-    if(_rotation > (M_PI * 2.0f))
+    #endif
+    while(_rotation > (M_PI * 2.0f))
     {
         _rotation -= (M_PI * 2.0f);
     }
-    else if(_rotation < 0.0)
+    while(_rotation < 0.0)
     {
         _rotation += (M_PI * 2.0f);
     }

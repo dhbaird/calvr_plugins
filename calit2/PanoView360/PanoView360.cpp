@@ -330,6 +330,45 @@ void PanoView360::preFrame()
        _cdLeft->updateRotate(_spinScale * PluginHelper::getValuator(0,0));
        _cdRight->updateRotate(_spinScale * PluginHelper::getValuator(0,0));
    } 
+    if (_cdLeft) {
+        osg::Matrixd camera = PluginHelper::getObjectMatrix();
+        osg::Quat qcamera = camera.getRotate();
+        osg::Matrixd newcamera;
+        newcamera.makeIdentity();
+        #if 0
+        {
+                osg::Quat newqcamera;
+                // Limit angular degrees of freedom...
+                // See also: http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+                float q0 = qcamera.x();
+                float q1 = qcamera.y();
+                float q2 = qcamera.z();
+                float q3 = qcamera.w();
+                float t1 = atan2(2*(q0*q1 + q2*q3), 1 - 2*(q1*q1 + q2*q2));
+                float t2 = 0; //asin(2*(q0*q2 - q3*q1));
+                float t3 = atan2(2*(q0*q3 + q1*q2), 1-2*(q2*q2 + q3*q3));
+                newqcamera.set(
+                    cos(t1/2)*cos(t2/2)*cos(t3/2) + sin(t1/2)*sin(t2/2)*sin(t3/2),
+                    sin(t1/2)*cos(t2/2)*cos(t3/2) - cos(t1/2)*sin(t2/2)*sin(t3/2),
+                    cos(t1/2)*sin(t2/2)*cos(t3/2) + sin(t1/2)*cos(t2/2)*sin(t3/2),
+                    cos(t1/2)*cos(t2/2)*sin(t3/2) - sin(t1/2)*sin(t2/2)*cos(t3/2)
+                );
+                newcamera.postMultRotate(newqcamera);
+        }
+        #endif
+        {
+            float x = camera(0, 0);
+            float y = camera(1, 0);
+            float z = camera(2, 0);
+            //float scale; // TODO
+            float azimuth = atan2(y, x);
+            //float elevation = atan2(z, sqrt(x*x + y*y)); // <-- not quite right, yet
+            //newcamera *= osg::Matrixd::rotate(azimuth, 0, 0, 1);
+            //newcamera *= osg::Matrixd::rotate(elevation, 1, 0, 0); // <-- not quite right, yet
+            _cdLeft->updateRotate(azimuth);
+            _cdRight->updateRotate(azimuth);
+        }
+    }
 }
 
 bool PanoView360::processEvent(InteractionEvent * event)
